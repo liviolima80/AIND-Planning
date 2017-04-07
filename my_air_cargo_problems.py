@@ -3,7 +3,9 @@ from aimacode.planning import Action
 from aimacode.search import (
     Node, Problem,
 )
-from aimacode.utils import expr
+from aimacode.utils import (
+    expr, FIFOQueue, Stack,
+)
 from lp_utils import (
     FluentState, encode_state, decode_state,
 )
@@ -206,9 +208,31 @@ class AirCargoProblem(Problem):
         executed.
         '''
         # TODO implement (see Russell-Norvig Ed-3 10.2.3  or Russell-Norvig Ed-2 11.2)
-        count = 0
-        return count
+        # implementation of BFS on relaxed problem
 
+        frontier = FIFOQueue()
+        frontier_l = []
+        explored = []
+
+        frontier.append([node.state, 0])
+
+        while True:
+            if (frontier.__len__() == 0):
+                return 0
+
+            next_node = frontier.pop()
+            frontier_l = [x for x in frontier_l if x != next_node[0]]
+            if (self.goal_test(next_node[0])):
+                return next_node[1]
+
+            if (next_node[0] not in explored):
+                explored.append(next_node[0])
+
+            for action in self.actions_list:
+                new_state = self.result(next_node[0], action)
+                if (new_state not in explored and new_state not in frontier_l):
+                    frontier.append([new_state, next_node[1]+1])
+                    frontier_l.append(new_state)
 
 def air_cargo_p1() -> AirCargoProblem:
     cargos = ['C1', 'C2']
