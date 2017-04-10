@@ -220,6 +220,7 @@ class PlanningGraph():
         self.fs = decode_state(state, problem.state_map)
         self.serial = serial_planning
         self.all_actions = self.problem.actions_list + self.noop_actions(self.problem.state_map)
+        #print("PlanningGraph state ",self.problem.state_map)
         self.s_levels = []
         self.a_levels = []
         self.create_graph()
@@ -267,6 +268,7 @@ class PlanningGraph():
             builds the graph by filling s_levels[] and a_levels[] lists with node sets for each level
         '''
         # the graph should only be built during class construction
+
         if (len(self.s_levels) != 0) or (len(self.a_levels) != 0):
             raise Exception(
                 'Planning Graph already created; construct a new planning graph for each new state in the planning sequence')
@@ -288,9 +290,17 @@ class PlanningGraph():
             self.add_action_level(level)
             self.update_a_mutex(self.a_levels[level])
 
+            """print("-------- level ", level, " actions -----------")
+            for a in self.a_levels[level]:
+                a.show()"""
+
             level += 1
             self.add_literal_level(level)
-            self.update_s_mutex(self.s_levels[level])
+            #self.update_s_mutex(self.s_levels[level])
+
+            """print("-------- level ", level, " state -----------")
+            for s in self.s_levels[level]:
+                s.show()"""
 
             if self.s_levels[level] == self.s_levels[level - 1]:
                 leveled = True
@@ -304,6 +314,7 @@ class PlanningGraph():
         :return:
             adds A nodes to the current level in self.a_levels[level]
         '''
+
         # TODO add action A level to the planning graph as described in the Russell-Norvig text
         # 1. determine what actions to add and create those PgNode_a objects
         # 2. connect the nodes to the previous S literal level
@@ -311,6 +322,30 @@ class PlanningGraph():
         #   set iff all prerequisite literals for the action hold in S0.  This can be accomplished by testing
         #   to see if a proposed PgNode_a has prenodes that are a subset of the previous S level.  Once an
         #   action node is added, it MUST be connected to the S node instances in the appropriate s_level set.
+
+        self.a_levels.append(set())
+
+        for a in self.all_actions:
+            new_node = PgNode_a(a)
+
+            add_action = True
+            s_nodes = []
+            for x in new_node.prenodes:
+                ok_prenode = False
+                for y in self.s_levels[level]:
+                    ok_prenode = ok_prenode or x.__eq__(y)
+                    if x.__eq__(y):
+                        s_nodes.append(y)
+                        break
+                if not ok_prenode:
+                    add_action = False
+                    break
+
+            if add_action:
+                for p in s_nodes:
+                    new_node.parents.add(p)
+                    p.children.add(new_node)
+                self.a_levels[level].add(new_node)
 
     def add_literal_level(self, level):
         ''' add an S (literal) level to the Planning Graph
@@ -329,6 +364,19 @@ class PlanningGraph():
         #   may be "added" to the set without fear of duplication.  However, it is important to then correctly create and connect
         #   all of the new S nodes as children of all the A nodes that could produce them, and likewise add the A nodes to the
         #   parent sets of the S nodes
+
+        self.s_levels.append(set())
+
+        for a in self.a_levels[level-1]:
+            for e in a.effect_s_nodes():
+                e.parents.add(a)
+                if e not in self.s_levels[level]:
+                    self.s_levels[level].add(e)
+                else:
+                    for el in self.s_levels[level]:
+                        if el.__eq__(e):
+                            el.parents.add(a)
+                a.children.add(e)
 
     def update_a_mutex(self, nodeset):
         ''' Determine and update sibling mutual exclusion for A-level nodes
@@ -387,6 +435,17 @@ class PlanningGraph():
         :return: bool
         '''
         # TODO test for Inconsistent Effects between nodes
+
+        for ep in node_a1.action.effect_add:
+            for en in node_a2.action.effect_rem:
+                if ep.__eq__(en):
+                    return True
+
+        for ep in node_a2.action.effect_add:
+            for en in node_a1.action.effect_rem:
+                if ep.__eq__(en):
+                    return True
+
         return False
 
     def interference_mutex(self, node_a1: PgNode_a, node_a2: PgNode_a) -> bool:
@@ -404,6 +463,27 @@ class PlanningGraph():
         :return: bool
         '''
         # TODO test for Interference between nodes
+
+        for ep in node_a1.action.effect_add:
+            for en in node_a2.action.precond_neg:
+                if ep.__eq__(en):
+                    return True
+
+        for ep in node_a1.action.effect_rem:
+            for en in node_a2.action.precond_pos:
+                if ep.__eq__(en):
+                    return True
+
+        for ep in node_a2.action.effect_add:
+            for en in node_a1.action.precond_neg:
+                if ep.__eq__(en):
+                    return True
+
+        for ep in node_a2.action.effect_rem:
+            for en in node_a1.action.precond_pos:
+                if ep.__eq__(en):
+                    return True
+
         return False
 
     def competing_needs_mutex(self, node_a1: PgNode_a, node_a2: PgNode_a) -> bool:
@@ -418,6 +498,12 @@ class PlanningGraph():
         '''
 
         # TODO test for Competing Needs between nodes
+
+        for p1 in node_a1.parents:
+            for p2 in node_a2.parents:
+                if p1.is_mutex(p2):
+                    return True
+
         return False
 
     def update_s_mutex(self, nodeset: set):
@@ -453,6 +539,10 @@ class PlanningGraph():
         :return: bool
         '''
         # TODO test for negation between nodes
+
+        if node_s1.symbol == node_s2.symbol and node_s1.is_pos != node_s2.is_pos:
+            return True
+
         return False
 
     def inconsistent_support_mutex(self, node_s1: PgNode_s, node_s2: PgNode_s):
