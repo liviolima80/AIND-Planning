@@ -200,7 +200,7 @@ class AirCargoProblem(Problem):
         pg_levelsum = pg.h_levelsum()
         return pg_levelsum
 
-    def h_ignore_preconditions(self, node: Node):
+    def h_ignore_preconditions_v2(self, node: Node):
         '''
         This heuristic estimates the minimum number of actions that must be
         carried out from the current state in order to satisfy all of the goal
@@ -233,6 +233,23 @@ class AirCargoProblem(Problem):
                 if (new_state not in explored and new_state not in frontier_l):
                     frontier.append([new_state, next_node[1]+1])
                     frontier_l.append(new_state)
+
+    def h_ignore_preconditions(self, node: Node):
+        '''
+        This heuristic estimates the minimum number of actions that must be
+        carried out from the current state in order to satisfy all of the goal
+        conditions by ignoring the preconditions required for an action to be
+        executed.
+        '''
+        # TODO implement (see Russell-Norvig Ed-3 10.2.3  or Russell-Norvig Ed-2 11.2)
+
+        counter = 0
+        kb = PropKB()
+        kb.tell(decode_state(node.state, self.state_map).pos_sentence())
+        for clause in self.goal:
+            if clause not in kb.clauses:
+                counter = counter + 1
+        return counter
 
 def air_cargo_p1() -> AirCargoProblem:
     cargos = ['C1', 'C2']
